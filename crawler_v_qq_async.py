@@ -240,7 +240,7 @@ def process_video_page(resp_dic):
     return video_dict
 
 start = time.time()
-task_lst = lst_page_task()
+task_lst = lst_page_task(target_channel='王者荣耀')
 #lst_page_task_lst = lst_page_task(target_channel='游戏')
 #lst_page_task_lst2 = lst_page_task(target_channel='时尚')
 #task_lst.extend(lst_page_task_lst)

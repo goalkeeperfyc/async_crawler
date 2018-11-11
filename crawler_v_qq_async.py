@@ -127,7 +127,8 @@ def retry_get_lst_page(lsturl,
     return video_url_lst
 
 
-async def lst_page(loop,
+async def lst_page(pool,
+                   loop,
                    task_lst,
                    platform='腾讯视频',
                    output_to_file=True,
@@ -178,9 +179,8 @@ def process_video_page(resp_dic):
     soup = BeautifulSoup(page, 'html.parser')
     try:
         soup_find = soup.find("script", {"r-notemplate": "true"})
-        if soup_find != None:
-            midstep = soup_find.text
-            video_info_var_Lst = re.findall('var\s+VIDEO_INFO\s+=\s*{.+}', midstep)
+        midstep = soup_find.text
+        video_info_var_Lst = re.findall('var\s+VIDEO_INFO\s+=\s*{.+}', midstep)
     except:
         print("can't get info from video page")
         return None

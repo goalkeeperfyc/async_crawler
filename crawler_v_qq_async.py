@@ -148,6 +148,7 @@ async def lst_page(pool,
             video_result, unfinished = await asyncio.wait(task_video_page)
             video_page_download_result_lst = [v.result() for v in video_result]
             for video_html in video_page_download_result_lst:
+                #multiprocess.Pool here is not suitable, maybe push to redis is a good idea
                 video_data_dic = process_video_page(resp_dic=video_html)
                 print(video_data_dic)
                 final_result_lst.append(video_data_dic)

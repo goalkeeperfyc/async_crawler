@@ -16,7 +16,7 @@ arg_parse.add_argument('-c', '--conf', default='/home/hanye/crawlers/crawler_sys
 args = arg_parse.parse_args()
 
 config = configparser.ConfigParser()
-config.read(filenames=)
+config.read(filenames=args.conf)
 platform = args.platform
 
-task_lst = 
+task_lst = config[platform]

@@ -106,8 +106,10 @@ async def asynchronous_get_lst_page(session, url):
     return page
 
 async def asynchronous_get_video_page(session, data_dic):
-    url = data_dic['url']
-    play_count = data_dic['play_count']
+    url = data_dic[b'url']
+    url = url.decode("utf-8")
+    print(url)
+    play_count = data_dic[b'play_count']
     get_page = await session.get(url)
     page = await get_page.text("utf-8", errors="ignore")
     return {'page': page, 'play_count': play_count, 'url': url}
@@ -128,24 +130,18 @@ def retry_get_lst_page(lsturl,
 
 
 async def video_page(loop,
-                   task_lst,
-                   platform='腾讯视频',
-                   output_to_file=True,
-                   filepath='/home/fangyucheng/python_code',
-                   output_to_es_raw=False,
-                   es_index=None,
-                   doc_type=None):
-    for lsturl in task_lst:
-        print("current lsturl is %s" % lsturl)
-        video_url_lst = retry_get_lst_page(lsturl)
-        if video_url_lst == []:
-            continue
-        print("get %s page url list whose length is %s" % (lsturl, len(video_url_lst)))
+                     task_lst,
+                     platform='腾讯视频',
+                     output_to_file=True,
+                     filepath='/home/fangyucheng/python_code',
+                     output_to_es_raw=False,
+                     es_index=None,
+                     doc_type=None):
         async with aiohttp.ClientSession() as sess_video_page:
-            task_video_page = [loop.create_task(asynchronous_get_video_page(sess_video_page, data_dic)) for data_dic in video_url_lst]
+            task_video_page = [loop.create_task(asynchronous_get_video_page(sess_video_page, data_dic)) for data_dic in task_lst]
             video_result, unfinished = await asyncio.wait(task_video_page)
             video_page_download_result_lst = [v.result() for v in video_result]
-            connect_with_redis.push_to_redis(result_lst=video_page_download_result_lst)
+            connect_with_redis.push_video_page_html_to_redis(result_lst=video_page_download_result_lst)
             print('success write into redis')
 
 
@@ -213,9 +209,12 @@ async def lst_page(loop,
 
 
 def process_video_page(resp_dic):
-    url = resp_dic['url']
-    play_count = resp_dic['play_count']
-    page = resp_dic['page']
+    url = resp_dic[b'url']
+    url = url.decode("utf-8")
+    play_count = resp_dic[b'play_count']
+    play_count = play_count.decode("utf-8")
+    page = resp_dic[b'page']
+    page = page.decode("utf-8")
     soup = BeautifulSoup(page, 'html.parser')
     try:
         soup_find = soup.find("script", {"r-notemplate": "true"})
@@ -280,6 +279,16 @@ def process_video_page(resp_dic):
     return video_dict
 
 
+def parse_video_page_single_process(file_name='/home/fangyucheng/test'):
+    result_lst = []
+    task_lst = connect_with_redis.retrieve_video_html_from_redis()
+    for raw_video_dic in task_lst:
+        video_page = process_video_page(resp_dic=raw_video_dic)
+        result_lst.append(video_page)
+    dic_lst_to_file(listname=result_lst, filename=file_name)
+    return result_lst
+
+
 def run_lst_page_asyncio():
     start = time.time()
     task_lst = lst_page_task(target_channel='旅游')
@@ -294,5 +303,23 @@ def run_lst_page_asyncio():
     cost_time = time.time() - start
     print("the total cost of time is %s" % str(cost_time))
 
+
+def run_video_page_asyncio():
+    start = time.time()
+    task_lst = connect_with_redis.retrieve_url_dict_from_redis()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(video_page(loop, task_lst=task_lst))
+    cost_time = time.time() - start
+    print("the total cost of time is %s" % str(cost_time))
+
+
+
+
+
 if __name__ == "__main__":
-    run_lst_page_asyncio()
+    #run_lst_page_asyncio()
+    #run_video_page_asyncio()
+    start = time.time()
+    parse_video_page_single_process()
+    cost = time.time() - start
+    print("the cost of time is %s" % cost)

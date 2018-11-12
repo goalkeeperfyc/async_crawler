@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 from crawler.crawler_sys.utils.output_results import output_result
 #from crawler_sys.utils.output_log import output_log
 from crawler.crawler_sys.utils.trans_str_play_count_to_int import trans_play_count
-
+from crawler.crawler_sys.utils import connect_with_redis
 
 """
 '电影': 'http://v.qq.com/x/list/movie',
@@ -127,8 +127,7 @@ def retry_get_lst_page(lsturl,
     return video_url_lst
 
 
-async def lst_page(pool,
-                   loop,
+async def video_page(loop,
                    task_lst,
                    platform='腾讯视频',
                    output_to_file=True,
@@ -136,7 +135,6 @@ async def lst_page(pool,
                    output_to_es_raw=False,
                    es_index=None,
                    doc_type=None):
-    final_result_lst = []
     for lsturl in task_lst:
         print("current lsturl is %s" % lsturl)
         video_url_lst = retry_get_lst_page(lsturl)
@@ -147,30 +145,71 @@ async def lst_page(pool,
             task_video_page = [loop.create_task(asynchronous_get_video_page(sess_video_page, data_dic)) for data_dic in video_url_lst]
             video_result, unfinished = await asyncio.wait(task_video_page)
             video_page_download_result_lst = [v.result() for v in video_result]
-            for video_html in video_page_download_result_lst:
-                #multiprocess.Pool here is not suitable, maybe push to redis is a good idea
-                video_data_dic = process_video_page(resp_dic=video_html)
-                print(video_data_dic)
-                final_result_lst.append(video_data_dic)
-                print("the length of video list is %s" % len(final_result_lst))
-                if len(final_result_lst) >= 100:
-                    output_result(result_Lst=final_result_lst,
-                                  platform=platform,
-                                  output_to_file=output_to_file,
-                                  filepath=filepath,
-                                  output_to_es_raw=output_to_es_raw,
-                                  es_index=es_index,
-                                  doc_type=doc_type)
-                    final_result_lst.clear()
-    if final_result_lst != []:
-        output_result(result_Lst=final_result_lst,
-                      platform=platform,
-                      output_to_file=output_to_file,
-                      filepath=filepath,
-                      output_to_es_raw=output_to_es_raw,
-                      es_index=es_index,
-                      doc_type=doc_type)
-    return final_result_lst
+            connect_with_redis.push_to_redis(result_lst=video_page_download_result_lst)
+            print('success write into redis')
+
+
+
+async def lst_page(loop,
+                   task_lst,
+                   platform='腾讯视频',
+                   output_to_file=True,
+                   filepath='/home/fangyucheng/python_code',
+                   output_to_es_raw=False,
+                   es_index=None,
+                   doc_type=None):
+    url_lst = []
+    async with aiohttp.ClientSession() as sess_lst_page:
+        task_video_page = [loop.create_task(asynchronous_get_video_page(sess_lst_page, lst_url)) for lst_url in task_lst]
+        lst_result, unfinished = await asyncio.wait(task_video_page)
+        lst_page_download_result_lst = [v.result() for v in lst_result]
+        for lst_html in lst_page_download_result_lst:
+            url_lst_partial = process_lst_page(resp=lst_html)
+            url_lst.extend(url_lst_partial)
+        print("the length of url list is %s" % len(url_lst))
+        connect_with_redis.push_url_dict_lst_to_redis(result_lst=url_lst)
+        print('success write into redis')
+
+#    for lsturl in task_lst:
+#        print("current lsturl is %s" % lsturl)
+#        video_url_lst = retry_get_lst_page(lsturl)
+#        if video_url_lst == []:
+#            continue
+#        print("get %s page url list whose length is %s" % (lsturl, len(video_url_lst)))
+#        async with aiohttp.ClientSession() as sess_video_page:
+#            task_video_page = [loop.create_task(asynchronous_get_video_page(sess_video_page, data_dic)) for data_dic in video_url_lst]
+#            video_result, unfinished = await asyncio.wait(task_video_page)
+#            video_page_download_result_lst = [v.result() for v in video_result]
+#            connect_with_redis.push_to_redis(result_lst=video_page_download_result_lst)
+#            print('success write into redis')
+
+
+
+#
+#            for video_html in video_page_download_result_lst:
+#            
+#                #multiprocess.Pool here is not suitable, maybe push to redis is a good idea
+#                video_data_dic = process_video_page(resp_dic=video_html)
+#                print(video_data_dic)
+#                final_result_lst.append(video_data_dic)
+#                print("the length of video list is %s" % len(final_result_lst))
+#                if len(final_result_lst) >= 100:
+#                    output_result(result_Lst=final_result_lst,
+#                                  platform=platform,
+#                                  output_to_file=output_to_file,
+#                                  filepath=filepath,
+#                                  output_to_es_raw=output_to_es_raw,
+#                                  es_index=es_index,
+#                                  doc_type=doc_type)
+#                    final_result_lst.clear()
+#    if final_result_lst != []:
+#        output_result(result_Lst=final_result_lst,
+#                      platform=platform,
+#                      output_to_file=output_to_file,
+#                      filepath=filepath,
+#                      output_to_es_raw=output_to_es_raw,
+#                      es_index=es_index,
+#                      doc_type=doc_type)
 
 
 def process_video_page(resp_dic):
@@ -240,15 +279,20 @@ def process_video_page(resp_dic):
     video_dict['video_intro'] = video_intro
     return video_dict
 
-start = time.time()
-task_lst = lst_page_task(target_channel='王者荣耀')
-#lst_page_task_lst = lst_page_task(target_channel='游戏')
-#lst_page_task_lst2 = lst_page_task(target_channel='时尚')
-#task_lst.extend(lst_page_task_lst)
-#task_lst = task_lst[:34]
-#task_lst.extend(lst_page_task_lst2)
-#tasks = [asyncio.ensure_future(lst_page2(lsturl=url)) for url in task_lst]
-loop = asyncio.get_event_loop()
-loop.run_until_complete(lst_page(loop, task_lst=task_lst))
-cost_time = time.time() - start
-print("the total cost of time is %s" % str(cost_time))
+
+def run_lst_page_asyncio():
+    start = time.time()
+    task_lst = lst_page_task(target_channel='旅游')
+    #lst_page_task_lst = lst_page_task(target_channel='游戏')
+    #lst_page_task_lst2 = lst_page_task(target_channel='时尚')
+    #task_lst.extend(lst_page_task_lst)
+    #task_lst = task_lst[:34]
+    #task_lst.extend(lst_page_task_lst2)
+    #tasks = [asyncio.ensure_future(lst_page2(lsturl=url)) for url in task_lst]
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(lst_page(loop, task_lst=task_lst))
+    cost_time = time.time() - start
+    print("the total cost of time is %s" % str(cost_time))
+
+if __name__ == "__main__":
+    run_lst_page_asyncio()

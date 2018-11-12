@@ -9,9 +9,14 @@ import redis
 
 rds = redis.StrictRedis(host='127.0.0.1', port=6379)
 
-def push_to_redis(result_lst):
-    name = 1
+def push_url_dict_lst_to_redis(result_lst):
     for line in result_lst:
-        rds.hmset(name=str(name),
+        url = line['url']
+        rds.hmset(name=url,
                   mapping=line)
-        name += 1
+
+#test
+#if __name__ == "__main__":
+#    result_lst = [{'ddd':'123'}, {'eee':'456'}]
+#    push_to_redis(result_lst)
+    

@@ -160,7 +160,7 @@ async def lst_page(loop,
                    doc_type=None):
     url_lst = []
     async with aiohttp.ClientSession() as sess_lst_page:
-        task_video_page = [loop.create_task(asynchronous_get_video_page(sess_lst_page, lst_url)) for lst_url in task_lst]
+        task_video_page = [loop.create_task(asynchronous_get_lst_page(sess_lst_page, lst_url)) for lst_url in task_lst]
         lst_result, unfinished = await asyncio.wait(task_video_page)
         lst_page_download_result_lst = [v.result() for v in lst_result]
         for lst_html in lst_page_download_result_lst:

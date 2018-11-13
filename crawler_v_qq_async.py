@@ -94,8 +94,8 @@ def process_lst_page(resp):
             play_count = trans_play_count(play_count_str)
         except:
             play_count = 0
-        video_dic = {'url': url,
-                     'play_count': play_count}
+        video_dic = {"url": url,
+                     "play_count": play_count}
         video_lst.append(video_dic)
     return video_lst
 
@@ -106,10 +106,8 @@ async def asynchronous_get_lst_page(session, url):
     return page
 
 async def asynchronous_get_video_page(session, data_dic):
-    url = data_dic[b'url']
-    url = url.decode("utf-8")
-    print(url)
-    play_count = data_dic[b'play_count']
+    url = data_dic['url']
+    play_count = data_dic['play_count']
     get_page = await session.get(url)
     page = await get_page.text("utf-8", errors="ignore")
     return {'page': page, 'play_count': play_count, 'url': url}
@@ -292,12 +290,6 @@ def parse_video_page_single_process(file_name='/home/fangyucheng/test'):
 def run_lst_page_asyncio():
     start = time.time()
     task_lst = lst_page_task(target_channel='旅游')
-    #lst_page_task_lst = lst_page_task(target_channel='游戏')
-    #lst_page_task_lst2 = lst_page_task(target_channel='时尚')
-    #task_lst.extend(lst_page_task_lst)
-    #task_lst = task_lst[:34]
-    #task_lst.extend(lst_page_task_lst2)
-    #tasks = [asyncio.ensure_future(lst_page2(lsturl=url)) for url in task_lst]
     loop = asyncio.get_event_loop()
     loop.run_until_complete(lst_page(loop, task_lst=task_lst))
     cost_time = time.time() - start
@@ -317,9 +309,9 @@ def run_video_page_asyncio():
 
 
 if __name__ == "__main__":
-    #run_lst_page_asyncio()
-    #run_video_page_asyncio()
+    #parse_video_page_single_process()
     start = time.time()
-    parse_video_page_single_process()
+    run_video_page_asyncio()
+    #run_video_page_asyncio()
     cost = time.time() - start
     print("the cost of time is %s" % cost)

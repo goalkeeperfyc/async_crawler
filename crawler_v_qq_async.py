@@ -135,12 +135,17 @@ async def video_page(loop,
                      output_to_es_raw=False,
                      es_index=None,
                      doc_type=None):
-        async with aiohttp.ClientSession() as sess_video_page:
-            task_video_page = [loop.create_task(asynchronous_get_video_page(sess_video_page, data_dic)) for data_dic in task_lst]
-            video_result, unfinished = await asyncio.wait(task_video_page)
-            video_page_download_result_lst = [v.result() for v in video_result]
-            connect_with_redis.push_video_page_html_to_redis(result_lst=video_page_download_result_lst)
-            print('success write into redis')
+    result_lst = []
+    async with aiohttp.ClientSession() as sess_video_page:
+        task_video_page = [loop.create_task(asynchronous_get_video_page(sess_video_page, data_dic)) for data_dic in task_lst]
+        video_result, unfinished = await asyncio.wait(task_video_page)
+        video_page_download_result_lst = [v.result() for v in video_result]
+        for video_html in video_page_download_result_lst:
+            video_data = process_video_page(resp_dic=video_html)
+            result_lst.append(video_data)
+            if len(result_lst) >= 100:
+                output_result
+        print('success write into redis')
 
 
 
@@ -265,6 +270,7 @@ def process_video_page(resp_dic):
         video_intro = None
     fetch_time = int(datetime.datetime.timestamp(datetime.datetime.now())*1e3)
     video_dict = {}
+    video_dict['platform'] = '腾讯视频'
     video_dict['url'] = url
     video_dict['title'] = title
     video_dict['releaser'] = releaser
@@ -277,14 +283,24 @@ def process_video_page(resp_dic):
     return video_dict
 
 
-def parse_video_page_single_process(file_name='/home/fangyucheng/test'):
+def parse_video_page_single_process(output_to_file=False,
+                                    filepath=None,
+                                    output_to_es_raw=True,
+                                    output_to_es_register=False,
+                                    es_index='test2',
+                                    doc_type='async_crawler'):
     result_lst = []
     task_lst = connect_with_redis.retrieve_video_html_from_redis()
     for raw_video_dic in task_lst:
         video_page = process_video_page(resp_dic=raw_video_dic)
         result_lst.append(video_page)
-    dic_lst_to_file(listname=result_lst, filename=file_name)
-    return result_lst
+    output_result(result_Lst=task_lst,
+                  platform='腾讯视频',
+                  output_to_file=output_to_file,
+                  filepath=filepath,
+                  output_to_es_raw=output_to_es_raw,
+                  es_index=es_index,
+                  doc_type=doc_type)
 
 
 def run_lst_page_asyncio():

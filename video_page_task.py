@@ -15,4 +15,5 @@ while True:
         crawler_v_qq_async.run_video_page_asyncio()
     else:
         print("there is no data in redis")
+        break
         time.sleep(5)

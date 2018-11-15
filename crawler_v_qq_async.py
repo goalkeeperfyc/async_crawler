@@ -136,15 +136,9 @@ async def video_page(loop, task_lst):
         print('success write into redis')
 
 
-async def lst_page(loop,
-                   task_lst,
-                   platform='腾讯视频',
-                   output_to_file=True,
-                   filepath='/home/fangyucheng/python_code',
-                   output_to_es_raw=False,
-                   es_index=None,
-                   doc_type=None):
+async def lst_page(loop, task_lst):
     url_lst = []
+    count = 0
     async with aiohttp.ClientSession() as sess_lst_page:
         task_video_page = [loop.create_task(asynchronous_get_lst_page(sess_lst_page, lst_url)) for lst_url in task_lst]
         lst_result, unfinished = await asyncio.wait(task_video_page)
@@ -152,9 +146,9 @@ async def lst_page(loop,
         for lst_html in lst_page_download_result_lst:
             url_lst_partial = process_lst_page(resp=lst_html)
             url_lst.extend(url_lst_partial)
+            count += 1
         print("the length of url list is %s" % len(url_lst))
         connect_with_redis.push_url_dict_lst_to_redis(result_lst=url_lst)
-        print('success write into redis')
 
 
 def process_video_page(resp_str):
@@ -229,7 +223,8 @@ def process_video_page(resp_str):
 
 def run_lst_page_asyncio():
     start = time.time()
-    task_lst = lst_page_task(target_channel='游戏')
+    task_lst = lst_page_task(target_channel='军事')
+    print('the length of task list is %s' % len(task_lst))
     loop = asyncio.get_event_loop()
     loop.run_until_complete(lst_page(loop, task_lst=task_lst))
     cost_time = time.time() - start
@@ -251,7 +246,6 @@ def parse_video_page_single_process(output_to_file=False,
                                     output_to_es_register=False,
                                     es_index='test2',
                                     doc_type='async_crawler2'):
-    start = time.time()
     result_lst = []
     count = 0
     while True:
@@ -268,5 +262,11 @@ def parse_video_page_single_process(output_to_file=False,
                           es_index=es_index,
                           doc_type=doc_type)
             result_lst.clear()
-    cost = time.time() - start
-    print("the cost of time is %s" % cost)
+    if result_lst != []:
+        output_result(result_Lst=result_lst,
+              platform='腾讯视频',
+              output_to_file=output_to_file,
+              filepath=filepath,
+              output_to_es_raw=output_to_es_raw,
+              es_index=es_index,
+              doc_type=doc_type)
